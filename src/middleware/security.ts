@@ -52,6 +52,11 @@ export const loginRateLimit = rateLimit({
 });
 
 export const csrfProtection = (req: Request, res: Response, next: NextFunction) => {
+  // DISABLE_CSRF=true in .env to bypass (debug/testing only)
+  if (process.env.DISABLE_CSRF === 'true') {
+    return next();
+  }
+
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
     return next();
   }
