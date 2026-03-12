@@ -24,19 +24,28 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 // Trust reverse proxy (Cloudflare, nginx, traefik, etc.) — MUST be before session
-// true = trust all proxies in the chain (Cloudflare → reverse proxy → app)
-app.set('trust proxy', true);
+// Number of proxy hops: Cloudflare(1) + optional nginx/traefik(2)
+app.set('trust proxy', 2);
 
 // Security
 app.use(helmetMiddleware);
-app.use(globalRateLimit);
 
 // Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static files
+// Static files — served BEFORE session middleware (no session overhead)
 app.use(express.static(path.join(__dirname, '../public')));
+
+// Catch favicon and other static 404s BEFORE session middleware
+// Prevents race condition: browser requests page + favicon simultaneously,
+// both create new sessions (no cookie yet), last Set-Cookie wins → CSRF mismatch
+app.use((req, res, next) => {
+  if (req.path === '/favicon.ico' || req.path.startsWith('/assets/')) {
+    return res.status(204).end();
+  }
+  next();
+});
 
 // Session (use SequelizeStore in production with MySQL)
 const SequelizeStore = require('connect-session-sequelize')(session.Store);
@@ -54,13 +63,19 @@ app.use(
     saveUninitialized: false,
     proxy: true,
     cookie: {
-      secure: isProduction && isBehindHttpsProxy ? true : false,
+      // 'auto' = Express decides based on req.secure (respects trust proxy)
+      // Fallback: if Cloudflare Flexible sends X-Forwarded-Proto: http,
+      // we still want secure cookies since the USER connects via HTTPS
+      secure: isBehindHttpsProxy ? true : false,
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24h
       sameSite: 'lax',
     },
   })
 );
+
+// Rate limiting (after session, uses trust proxy for IP detection)
+app.use(globalRateLimit);
 
 // CSRF
 app.use(generateCsrfToken);

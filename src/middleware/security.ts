@@ -16,12 +16,19 @@ export const helmetMiddleware = helmet({
   },
 });
 
+// Helper: get client IP reliably behind Cloudflare/proxies
+const getClientIp = (req: Request): string => {
+  return (req.headers['cf-connecting-ip'] as string) || req.ip || '0.0.0.0';
+};
+
 export const globalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 500,
   standardHeaders: true,
   legacyHeaders: false,
   message: 'Too many requests, please try again later.',
+  keyGenerator: getClientIp,
+  validate: { trustProxy: false },
 });
 
 export const sharePasswordRateLimit = rateLimit({
@@ -30,9 +37,8 @@ export const sharePasswordRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: 'Too many password attempts. Please wait a minute.',
-  keyGenerator: (req: Request) => {
-    return req.ip + ':' + req.params.uuid;
-  },
+  keyGenerator: (req: Request) => getClientIp(req) + ':' + req.params.uuid,
+  validate: { trustProxy: false },
 });
 
 export const loginRateLimit = rateLimit({
@@ -41,6 +47,8 @@ export const loginRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: 'Too many login attempts. Please try again later.',
+  keyGenerator: getClientIp,
+  validate: { trustProxy: false },
 });
 
 export const csrfProtection = (req: Request, res: Response, next: NextFunction) => {
