@@ -51,9 +51,6 @@ app.use((req, res, next) => {
 const SequelizeStore = require('connect-session-sequelize')(session.Store);
 const sessionStore = new SequelizeStore({ db: sequelize });
 
-const isProduction = process.env.NODE_ENV === 'production';
-const isBehindHttpsProxy = process.env.APP_URL?.startsWith('https');
-
 app.use(
   session({
     name: 'lockdrop.sid',
@@ -63,10 +60,10 @@ app.use(
     saveUninitialized: false,
     proxy: true,
     cookie: {
-      // 'auto' = Express decides based on req.secure (respects trust proxy)
-      // Fallback: if Cloudflare Flexible sends X-Forwarded-Proto: http,
-      // we still want secure cookies since the USER connects via HTTPS
-      secure: isBehindHttpsProxy ? true : false,
+      // secure: false is safe here — Cloudflare enforces HTTPS on the client side.
+      // The origin connection (Cloudflare → Docker) is HTTP, so secure: true
+      // breaks session cookies entirely. httpOnly + sameSite still protect the cookie.
+      secure: false,
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24h
       sameSite: 'lax',
