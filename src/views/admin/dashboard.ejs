@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - LockDrop</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#f0f4ff', 100: '#dbe4ff', 200: '#bac8ff', 300: '#91a7ff',
+              400: '#748ffc', 500: '#5c7cfa', 600: '#4c6ef5', 700: '#4263eb',
+              800: '#3b5bdb', 900: '#364fc7',
+            },
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .drop-zone-active { border-color: #4c6ef5 !important; background: #f0f4ff !important; }
+    .fade-in { animation: fadeIn 0.2s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50">
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center gap-3">
+          <div class="flex items-center justify-center w-9 h-9 rounded-xl bg-primary-600 text-white">
+            <i class="ri-lock-2-line text-lg"></i>
+          </div>
+          <span class="font-bold text-lg text-gray-900">LockDrop</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="openShareModal()" class="btn-primary text-sm">
+            <i class="ri-links-line mr-1.5"></i>Share Links
+          </button>
+          <a href="/auth/logout" class="btn-ghost text-sm">
+            <i class="ri-logout-box-r-line mr-1.5"></i>Logout
+          </a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Breadcrumbs -->
+    <nav class="flex items-center gap-1.5 text-sm mb-6">
+      <a href="/admin" class="text-gray-500 hover:text-primary-600 transition-colors flex items-center gap-1">
+        <i class="ri-home-5-line"></i>
+        Root
+      </a>
+      <% breadcrumbs.forEach((crumb, i) => { %>
+        <i class="ri-arrow-right-s-line text-gray-400"></i>
+        <% if (i < breadcrumbs.length - 1) { %>
+          <a href="/admin?folder=<%= crumb.uuid %>" class="text-gray-500 hover:text-primary-600 transition-colors"><%= crumb.name %></a>
+        <% } else { %>
+          <span class="text-gray-900 font-medium"><%= crumb.name %></span>
+        <% } %>
+      <% }) %>
+    </nav>
+
+    <!-- Actions bar -->
+    <div class="flex flex-wrap items-center gap-3 mb-6">
+      <button onclick="document.getElementById('newFolderModal').classList.remove('hidden')" class="btn-secondary text-sm">
+        <i class="ri-folder-add-line mr-1.5"></i>New Folder
+      </button>
+      <button onclick="document.getElementById('fileInput').click()" class="btn-secondary text-sm">
+        <i class="ri-upload-2-line mr-1.5"></i>Upload Files
+      </button>
+      <button onclick="document.getElementById('folderInput').click()" class="btn-secondary text-sm">
+        <i class="ri-folder-upload-line mr-1.5"></i>Upload Folder
+      </button>
+      <input type="file" id="fileInput" multiple class="hidden" onchange="handleFileSelect(this.files)">
+      <input type="file" id="folderInput" webkitdirectory class="hidden" onchange="handleFolderSelect(this.files)">
+    </div>
+
+    <!-- Drop zone + file list -->
+    <div id="dropZone" class="card overflow-hidden">
+      <!-- Upload progress -->
+      <div id="uploadProgress" class="hidden border-b border-gray-200 p-4 bg-blue-50">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-medium text-blue-700" id="uploadStatusText">Uploading...</span>
+          <span class="text-sm text-blue-600" id="uploadPercent">0%</span>
+        </div>
+        <div class="w-full bg-blue-200 rounded-full h-2">
+          <div id="uploadBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <% if (folders.length === 0 && files.length === 0) { %>
+        <div class="flex flex-col items-center justify-center py-20 text-center" id="emptyState">
+          <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+            <i class="ri-upload-cloud-2-line text-3xl text-gray-400"></i>
+          </div>
+          <h3 class="text-lg font-medium text-gray-900 mb-1">No files yet</h3>
+          <p class="text-gray-500 text-sm mb-4">Drag & drop files or folders here, or use the buttons above</p>
+        </div>
+      <% } else { %>
+        <!-- File/folder table -->
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b border-gray-200 bg-gray-50/50">
+                <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Size</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-44">Date</th>
+                <th class="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-44">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <% folders.forEach(folder => { %>
+                <tr class="hover:bg-gray-50 transition-colors group fade-in">
+                  <td class="px-4 py-3">
+                    <a href="/admin?folder=<%= folder.uuid %>" class="flex items-center gap-3 text-gray-900 hover:text-primary-600">
+                      <div class="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                        <i class="ri-folder-3-fill text-amber-500 text-lg"></i>
+                      </div>
+                      <span class="font-medium text-sm truncate"><%= folder.name %></span>
+                    </a>
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-500">—</td>
+                  <td class="px-4 py-3 text-sm text-gray-500"><%= new Date(folder.createdAt).toLocaleDateString('fr-FR') %></td>
+                  <td class="px-4 py-3 text-right">
+                    <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onclick="shareItem(null, '<%= folder.id %>', '<%= folder.name %>')" class="btn-ghost text-xs px-2 py-1" title="Share">
+                        <i class="ri-share-line"></i>
+                      </button>
+                      <button onclick="deleteFolder('<%= folder.uuid %>')" class="btn-ghost text-xs px-2 py-1 text-red-600 hover:bg-red-50" title="Delete">
+                        <i class="ri-delete-bin-6-line"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+              <% files.forEach(file => { %>
+                <tr class="hover:bg-gray-50 transition-colors group fade-in">
+                  <td class="px-4 py-3">
+                    <div class="flex items-center gap-3">
+                      <div class="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <i class="ri-file-3-line text-blue-500 text-lg"></i>
+                      </div>
+                      <div class="min-w-0">
+                        <p class="text-sm font-medium text-gray-900 truncate"><%= file.originalName %></p>
+                        <p class="text-xs text-gray-400"><%= file.mimeType %></p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-500"><%= formatSize(file.size) %></td>
+                  <td class="px-4 py-3 text-sm text-gray-500"><%= new Date(file.createdAt).toLocaleDateString('fr-FR') %></td>
+                  <td class="px-4 py-3 text-right">
+                    <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onclick="shareItem('<%= file.id %>', null, '<%= file.originalName %>')" class="btn-ghost text-xs px-2 py-1" title="Share">
+                        <i class="ri-share-line"></i>
+                      </button>
+                      <button onclick="deleteFile('<%= file.uuid %>')" class="btn-ghost text-xs px-2 py-1 text-red-600 hover:bg-red-50" title="Delete">
+                        <i class="ri-delete-bin-6-line"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <!-- Share Links Panel -->
+    <div id="shareLinksPanel" class="hidden mt-6">
+      <div class="card overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-200 bg-gray-50/50 flex items-center justify-between">
+          <h3 class="font-semibold text-gray-900 text-sm">Active Share Links</h3>
+          <button onclick="document.getElementById('shareLinksPanel').classList.add('hidden')" class="btn-ghost text-xs px-2 py-1">
+            <i class="ri-close-line"></i>
+          </button>
+        </div>
+        <div class="divide-y divide-gray-100">
+          <% if (shareLinks.length === 0) { %>
+            <div class="p-8 text-center text-gray-500 text-sm">No share links yet</div>
+          <% } else { %>
+            <% shareLinks.forEach(link => { %>
+              <div class="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <p class="text-sm font-medium text-gray-900 truncate"><%= link.name %></p>
+                    <% if (!link.isActive) { %>
+                      <span class="badge-red">Disabled</span>
+                    <% } else if (new Date() > new Date(link.expiresAt)) { %>
+                      <span class="badge-red">Expired</span>
+                    <% } else if (link.maxDownloads && link.downloadCount >= link.maxDownloads) { %>
+                      <span class="badge-red">Max DL</span>
+                    <% } else { %>
+                      <span class="badge-green">Active</span>
+                    <% } %>
+                  </div>
+                  <div class="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
+                    <span><i class="ri-download-line"></i> <%= link.downloadCount %><%= link.maxDownloads ? '/' + link.maxDownloads : '' %></span>
+                    <span><i class="ri-time-line"></i> Expires <%= new Date(link.expiresAt).toLocaleString('fr-FR') %></span>
+                    <span>
+                      <% if (link.file) { %>
+                        <i class="ri-file-line"></i> <%= link.file.originalName %>
+                      <% } else if (link.folder) { %>
+                        <i class="ri-folder-line"></i> <%= link.folder.name %>
+                      <% } %>
+                    </span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-1 ml-3">
+                  <button onclick="copyLink('<%= appUrl %>/s/<%= link.uuid %>')" class="btn-ghost text-xs px-2 py-1" title="Copy link">
+                    <i class="ri-file-copy-line"></i>
+                  </button>
+                  <button onclick="toggleShareLink('<%= link.uuid %>')" class="btn-ghost text-xs px-2 py-1" title="Toggle">
+                    <i class="ri-<%= link.isActive ? 'pause' : 'play' %>-line"></i>
+                  </button>
+                  <button onclick="deleteShareLink('<%= link.uuid %>')" class="btn-ghost text-xs px-2 py-1 text-red-600 hover:bg-red-50" title="Delete">
+                    <i class="ri-delete-bin-6-line"></i>
+                  </button>
+                </div>
+              </div>
+            <% }) %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- New Folder Modal -->
+  <div id="newFolderModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="card w-full max-w-md p-6 mx-4">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">New Folder</h3>
+      <form onsubmit="createFolder(event)">
+        <input type="text" id="folderNameInput" placeholder="Folder name" required class="input mb-4" autofocus>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="document.getElementById('newFolderModal').classList.add('hidden')" class="btn-secondary">Cancel</button>
+          <button type="submit" class="btn-primary">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Share Modal -->
+  <div id="shareModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="card w-full max-w-md p-6 mx-4">
+      <h3 class="text-lg font-semibold text-gray-900 mb-1">Create Share Link</h3>
+      <p class="text-sm text-gray-500 mb-4" id="shareTarget"></p>
+      <form onsubmit="createShareLink(event)">
+        <input type="hidden" id="shareFileId">
+        <input type="hidden" id="shareFolderId">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Link name</label>
+          <input type="text" id="shareName" class="input" placeholder="e.g. Project files for client">
+        </div>
+
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Password <span class="text-red-500">*</span></label>
+          <input type="text" id="sharePassword" required class="input" placeholder="Strong password">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Expires in</label>
+            <select id="shareExpires" class="input">
+              <option value="1">1 hour</option>
+              <option value="6">6 hours</option>
+              <option value="24" selected>24 hours</option>
+              <option value="72">3 days</option>
+              <option value="168">7 days</option>
+              <option value="720">30 days</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Max downloads</label>
+            <input type="number" id="shareMaxDl" class="input" placeholder="Unlimited" min="1">
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 mt-4">
+          <button type="button" onclick="document.getElementById('shareModal').classList.add('hidden')" class="btn-secondary">Cancel</button>
+          <button type="submit" class="btn-primary">
+            <i class="ri-links-line mr-1.5"></i>Create Link
+          </button>
+        </div>
+      </form>
+
+      <div id="shareLinkResult" class="hidden mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+        <p class="text-sm text-green-700 font-medium mb-2">Link created!</p>
+        <div class="flex items-center gap-2">
+          <input type="text" id="shareLinkUrl" readonly class="input flex-1 text-sm bg-white">
+          <button onclick="copyLink(document.getElementById('shareLinkUrl').value)" class="btn-primary text-sm">
+            <i class="ri-file-copy-line"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="hidden fixed bottom-6 right-6 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-lg shadow-lg text-sm flex items-center gap-2">
+    <i class="ri-check-line"></i>
+    <span id="toastMessage"></span>
+  </div>
+
+  <script>
+    const csrfToken = '<%= csrfToken %>';
+    const currentFolderId = '<%= currentFolder ? currentFolder.id : "" %>';
+
+    function formatSize(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      document.getElementById('toastMessage').textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 3000);
+    }
+
+    function copyLink(url) {
+      navigator.clipboard.writeText(url);
+      showToast('Link copied to clipboard');
+    }
+
+    // Drag & drop
+    const dropZone = document.getElementById('dropZone');
+    ['dragenter', 'dragover'].forEach(e => {
+      document.addEventListener(e, (ev) => { ev.preventDefault(); dropZone.classList.add('drop-zone-active'); });
+    });
+    ['dragleave', 'drop'].forEach(e => {
+      document.addEventListener(e, (ev) => { ev.preventDefault(); dropZone.classList.remove('drop-zone-active'); });
+    });
+    document.addEventListener('drop', (ev) => {
+      ev.preventDefault();
+      const items = ev.dataTransfer.items;
+      if (items) {
+        const entries = [];
+        for (let i = 0; i < items.length; i++) {
+          const entry = items[i].webkitGetAsEntry();
+          if (entry) entries.push(entry);
+        }
+        processEntries(entries);
+      } else if (ev.dataTransfer.files.length) {
+        handleFileSelect(ev.dataTransfer.files);
+      }
+    });
+
+    async function processEntries(entries) {
+      const files = [];
+      const paths = [];
+
+      async function readEntry(entry, basePath) {
+        if (entry.isFile) {
+          return new Promise((resolve) => {
+            entry.file((f) => {
+              files.push(f);
+              paths.push(basePath + f.name);
+              resolve();
+            });
+          });
+        } else if (entry.isDirectory) {
+          const reader = entry.createReader();
+          const subEntries = await new Promise((resolve) => {
+            const all = [];
+            function readBatch() {
+              reader.readEntries((results) => {
+                if (results.length === 0) { resolve(all); return; }
+                all.push(...results);
+                readBatch();
+              });
+            }
+            readBatch();
+          });
+          for (const sub of subEntries) {
+            await readEntry(sub, basePath + entry.name + '/');
+          }
+        }
+      }
+
+      for (const entry of entries) {
+        await readEntry(entry, '');
+      }
+
+      uploadFiles(files, paths);
+    }
+
+    function handleFileSelect(fileList) {
+      const files = Array.from(fileList);
+      uploadFiles(files, []);
+    }
+
+    function handleFolderSelect(fileList) {
+      const files = Array.from(fileList);
+      const paths = files.map(f => f.webkitRelativePath || f.name);
+      uploadFiles(files, paths);
+    }
+
+    async function uploadFiles(files, relativePaths) {
+      if (files.length === 0) return;
+
+      const progress = document.getElementById('uploadProgress');
+      const bar = document.getElementById('uploadBar');
+      const percent = document.getElementById('uploadPercent');
+      const statusText = document.getElementById('uploadStatusText');
+
+      progress.classList.remove('hidden');
+      bar.style.width = '0%';
+      statusText.textContent = `Uploading ${files.length} file(s)...`;
+
+      const formData = new FormData();
+      files.forEach(f => formData.append('files', f));
+      relativePaths.forEach(p => formData.append('relativePaths', p));
+      if (currentFolderId) formData.append('folderId', currentFolderId);
+
+      const xhr = new XMLHttpRequest();
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          bar.style.width = pct + '%';
+          percent.textContent = pct + '%';
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          statusText.textContent = 'Upload complete!';
+          bar.style.width = '100%';
+          setTimeout(() => location.reload(), 500);
+        } else {
+          statusText.textContent = 'Upload failed';
+          bar.classList.add('bg-red-600');
+        }
+      };
+      xhr.onerror = () => {
+        statusText.textContent = 'Upload failed';
+      };
+
+      xhr.open('POST', '/admin/upload');
+      xhr.setRequestHeader('X-CSRF-Token', csrfToken);
+      xhr.send(formData);
+    }
+
+    async function createFolder(e) {
+      e.preventDefault();
+      const name = document.getElementById('folderNameInput').value;
+      const res = await fetch('/admin/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ name, parentId: currentFolderId || null }),
+      });
+      if (res.ok) {
+        location.reload();
+      } else {
+        showToast('Failed to create folder');
+      }
+    }
+
+    async function deleteFolder(uuid) {
+      if (!confirm('Delete this folder and all its contents?')) return;
+      const res = await fetch(`/admin/folders/${uuid}`, {
+        method: 'DELETE',
+        headers: { 'X-CSRF-Token': csrfToken },
+      });
+      if (res.ok) location.reload();
+      else showToast('Failed to delete folder');
+    }
+
+    async function deleteFile(uuid) {
+      if (!confirm('Delete this file?')) return;
+      const res = await fetch(`/admin/files/${uuid}`, {
+        method: 'DELETE',
+        headers: { 'X-CSRF-Token': csrfToken },
+      });
+      if (res.ok) location.reload();
+      else showToast('Failed to delete file');
+    }
+
+    function shareItem(fileId, folderId, name) {
+      document.getElementById('shareFileId').value = fileId || '';
+      document.getElementById('shareFolderId').value = folderId || '';
+      document.getElementById('shareTarget').textContent = 'Sharing: ' + name;
+      document.getElementById('shareLinkResult').classList.add('hidden');
+      document.getElementById('shareModal').classList.remove('hidden');
+    }
+
+    async function createShareLink(e) {
+      e.preventDefault();
+      const body = {
+        _csrf: csrfToken,
+        name: document.getElementById('shareName').value || 'Shared files',
+        password: document.getElementById('sharePassword').value,
+        expiresIn: document.getElementById('shareExpires').value,
+        maxDownloads: document.getElementById('shareMaxDl').value || null,
+        fileId: document.getElementById('shareFileId').value || null,
+        folderId: document.getElementById('shareFolderId').value || null,
+      };
+      const res = await fetch('/admin/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('shareLinkUrl').value = data.link;
+        document.getElementById('shareLinkResult').classList.remove('hidden');
+      } else {
+        showToast(data.error || 'Failed to create link');
+      }
+    }
+
+    function openShareModal() {
+      const panel = document.getElementById('shareLinksPanel');
+      panel.classList.toggle('hidden');
+    }
+
+    async function toggleShareLink(uuid) {
+      await fetch(`/admin/share/${uuid}/toggle`, {
+        method: 'PATCH',
+        headers: { 'X-CSRF-Token': csrfToken },
+      });
+      location.reload();
+    }
+
+    async function deleteShareLink(uuid) {
+      if (!confirm('Delete this share link?')) return;
+      await fetch(`/admin/share/${uuid}`, {
+        method: 'DELETE',
+        headers: { 'X-CSRF-Token': csrfToken },
+      });
+      location.reload();
+    }
+  </script>
+</body>
+</html>
+
+<%
+function formatSize(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+%>

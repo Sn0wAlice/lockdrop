@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= link.name %> - LockDrop</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { primary: { 50:'#f0f4ff',100:'#dbe4ff',200:'#bac8ff',300:'#91a7ff',400:'#748ffc',500:'#5c7cfa',600:'#4c6ef5',700:'#4263eb',800:'#3b5bdb',900:'#364fc7' } } } }
+    }
+  </script>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css">
+  <style>body { font-family: 'Inter', system-ui, sans-serif; }</style>
+</head>
+<body class="min-h-screen bg-gray-50">
+  <div class="max-w-2xl mx-auto px-4 py-12">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-green-100 text-green-600 mb-4">
+        <i class="ri-shield-check-line text-2xl"></i>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-900"><%= link.name %></h1>
+      <div class="flex items-center justify-center gap-4 mt-2 text-sm text-gray-500">
+        <span><i class="ri-time-line"></i> Expires <%= new Date(link.expiresAt).toLocaleString('fr-FR') %></span>
+        <% if (link.maxDownloads) { %>
+          <span><i class="ri-download-line"></i> <%= link.downloadCount %>/<%= link.maxDownloads %> downloads</span>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Download all button -->
+    <% if (files.length > 1 || isFolder) { %>
+      <div class="mb-4">
+        <a href="/s/<%= link.uuid %>/download-zip" class="btn-primary w-full text-center block">
+          <i class="ri-file-zip-line mr-2"></i>
+          Download All as ZIP (<%= files.length %> files)
+        </a>
+      </div>
+    <% } %>
+
+    <!-- Files list -->
+    <div class="card overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-200 bg-gray-50/50">
+        <h3 class="font-semibold text-gray-900 text-sm">
+          <i class="ri-file-list-3-line mr-1"></i>
+          <%= files.length %> file<%= files.length !== 1 ? 's' : '' %>
+        </h3>
+      </div>
+      <div class="divide-y divide-gray-100">
+        <% files.forEach(item => { %>
+          <div class="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <div class="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <i class="ri-file-3-line text-blue-500 text-lg"></i>
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-gray-900 truncate"><%= item.file.originalName %></p>
+                <p class="text-xs text-gray-400">
+                  <%= item.relativePath !== item.file.originalName ? item.relativePath : '' %>
+                  <%= formatSize(item.file.size) %>
+                </p>
+              </div>
+            </div>
+            <a href="/s/<%= link.uuid %>/download/<%= item.file.uuid %>"
+               class="btn-secondary text-xs ml-3 flex-shrink-0">
+              <i class="ri-download-line mr-1"></i>Download
+            </a>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <p class="text-center text-xs text-gray-400 mt-8">Secured by LockDrop</p>
+  </div>
+</body>
+</html>
+
+<%
+function formatSize(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+%>

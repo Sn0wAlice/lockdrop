@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= link ? link.name : 'Unavailable' %> - LockDrop</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { primary: { 50:'#f0f4ff',100:'#dbe4ff',200:'#bac8ff',300:'#91a7ff',400:'#748ffc',500:'#5c7cfa',600:'#4c6ef5',700:'#4263eb',800:'#3b5bdb',900:'#364fc7' } } } }
+    }
+  </script>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css">
+  <style>body { font-family: 'Inter', system-ui, sans-serif; }</style>
+</head>
+<body class="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+  <div class="w-full max-w-md">
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-600 text-white mb-4">
+        <i class="ri-lock-2-line text-3xl"></i>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-900">LockDrop</h1>
+    </div>
+
+    <div class="card p-6">
+      <% if (error && !link) { %>
+        <!-- Error state (link doesn't exist or expired) -->
+        <div class="text-center py-4">
+          <div class="w-14 h-14 rounded-2xl bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <i class="ri-close-circle-line text-3xl text-red-500"></i>
+          </div>
+          <h2 class="text-lg font-semibold text-gray-900 mb-1">Unavailable</h2>
+          <p class="text-gray-500 text-sm"><%= error %></p>
+        </div>
+      <% } else if (link) { %>
+        <!-- Password form -->
+        <div class="text-center mb-6">
+          <h2 class="text-lg font-semibold text-gray-900"><%= link.name %></h2>
+          <p class="text-gray-500 text-sm mt-1">Enter the password to access the files</p>
+        </div>
+
+        <% if (error) { %>
+          <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2">
+            <i class="ri-error-warning-line"></i>
+            <%= error %>
+          </div>
+        <% } %>
+
+        <form method="POST" action="/s/<%= link.uuid %>">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <div class="relative">
+              <input type="password" name="password" required autofocus class="input pr-10" placeholder="Enter password" id="pwInput">
+              <button type="button" onclick="togglePw()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <i class="ri-eye-line" id="pwIcon"></i>
+              </button>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary w-full">
+            <i class="ri-lock-unlock-line mr-2"></i>
+            Access Files
+          </button>
+        </form>
+      <% } %>
+    </div>
+
+    <p class="text-center text-xs text-gray-400 mt-6">Secured by LockDrop</p>
+  </div>
+
+  <script>
+    function togglePw() {
+      const input = document.getElementById('pwInput');
+      const icon = document.getElementById('pwIcon');
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'ri-eye-off-line';
+      } else {
+        input.type = 'password';
+        icon.className = 'ri-eye-line';
+      }
+    }
+  </script>
+</body>
+</html>
