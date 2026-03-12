@@ -23,8 +23,9 @@ const port = parseInt(process.env.PORT || '3000', 10);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Trust reverse proxy (nginx, traefik, etc.) — MUST be before session
-app.set('trust proxy', 1);
+// Trust reverse proxy (Cloudflare, nginx, traefik, etc.) — MUST be before session
+// true = trust all proxies in the chain (Cloudflare → reverse proxy → app)
+app.set('trust proxy', true);
 
 // Security
 app.use(helmetMiddleware);
@@ -46,11 +47,12 @@ const isBehindHttpsProxy = process.env.APP_URL?.startsWith('https');
 
 app.use(
   session({
+    name: 'lockdrop.sid',
     secret: process.env.SESSION_SECRET || 'change-me',
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
-    proxy: isProduction && isBehindHttpsProxy ? true : undefined,
+    proxy: true,
     cookie: {
       secure: isProduction && isBehindHttpsProxy ? true : false,
       httpOnly: true,
@@ -88,7 +90,7 @@ async function start() {
     console.log('Database connected');
 
     await sequelize.sync({ alter: true });
-    sessionStore.sync();
+    await sessionStore.sync();
     console.log('Models synced');
 
     app.listen(port, '0.0.0.0', () => {

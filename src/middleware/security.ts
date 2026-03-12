@@ -52,6 +52,18 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
   const sessionToken = (req.session as any)?.csrfToken;
 
   if (!token || !sessionToken || token !== sessionToken) {
+    console.error('[CSRF FAIL]', {
+      path: req.path,
+      method: req.method,
+      hasSession: !!req.session,
+      sessionId: req.sessionID?.slice(0, 8),
+      hasCookie: !!req.headers.cookie,
+      tokenFromClient: token ? token.slice(0, 8) + '...' : 'MISSING',
+      tokenFromSession: sessionToken ? sessionToken.slice(0, 8) + '...' : 'MISSING',
+      proto: req.protocol,
+      forwarded: req.headers['x-forwarded-proto'],
+      secure: req.secure,
+    });
     return res.status(403).json({ error: 'Invalid CSRF token' });
   }
 
