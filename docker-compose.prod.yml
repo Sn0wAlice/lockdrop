@@ -1,0 +1,45 @@
+services:
+  app:
+    image: ghcr.io/sn0walice/lockdrop:latest
+    container_name: lockdrop
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=mysql
+    volumes:
+      - uploads:/app/uploads
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - lockdrop
+
+  mysql:
+    image: mysql:8.0
+    container_name: lockdrop-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - lockdrop
+
+volumes:
+  uploads:
+  mysql_data:
+
+networks:
+  lockdrop:
+    driver: bridge

@@ -62,6 +62,11 @@ export const generateCsrfToken = (req: Request, _res: Response, next: NextFuncti
   if (!(req.session as any).csrfToken) {
     const { v4: uuidv4 } = require('uuid');
     (req.session as any).csrfToken = uuidv4();
+    // Force session save so the token is persisted before the response
+    return req.session.save((err) => {
+      if (err) console.error('Session save error:', err);
+      next();
+    });
   }
   next();
 };

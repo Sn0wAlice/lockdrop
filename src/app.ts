@@ -23,10 +23,12 @@ const port = parseInt(process.env.PORT || '3000', 10);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+// Trust reverse proxy (nginx, traefik, etc.) — MUST be before session
+app.set('trust proxy', 1);
+
 // Security
 app.use(helmetMiddleware);
 app.use(globalRateLimit);
-app.set('trust proxy', 1);
 
 // Body parsing
 app.use(express.json());
@@ -39,17 +41,21 @@ app.use(express.static(path.join(__dirname, '../public')));
 const SequelizeStore = require('connect-session-sequelize')(session.Store);
 const sessionStore = new SequelizeStore({ db: sequelize });
 
+const isProduction = process.env.NODE_ENV === 'production';
+const isBehindHttpsProxy = process.env.APP_URL?.startsWith('https');
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'change-me',
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
+    proxy: isProduction && isBehindHttpsProxy ? true : undefined,
     cookie: {
-      secure: process.env.NODE_ENV === 'production' && process.env.APP_URL?.startsWith('https'),
+      secure: isProduction && isBehindHttpsProxy ? true : false,
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24h
-      sameSite: 'strict',
+      sameSite: 'lax',
     },
   })
 );
@@ -57,7 +63,8 @@ app.use(
 // CSRF
 app.use(generateCsrfToken);
 app.use('/auth', csrfProtection);
-app.use('/admin/share', csrfProtection);
+app.use('/admin', csrfProtection);
+app.use('/s', csrfProtection);
 
 // Routes
 app.get('/', (_req, res) => res.redirect('/admin'));
